@@ -1,0 +1,54 @@
+This is a mirror of http://www.vim.org/scripts/script.php?script_id=4816
+
+Description:
+  two commands for publishing highlighted code in HTML or TeX
+  (optionally from pandoc as highlighting engine from filter vimhl.hs)
+
+  github: http://github.com/lyokha/vim-publish-helper
+
+Usage:
+  The commands may be used from within vim. Additionally they can act as
+  the highlighting engine from pandoc having been inserted inside filter
+  vimhl.hs shipped with this distribution.
+
+  Command :MakeHtmlCodeHighlight to create a new buffer in a new window with
+  HTML code correctly highlighted accordingly to the current color scheme or
+  scheme declared in variable g:PhColorscheme. The command uses TOhtml
+  internally with temporarily set value g:html_use_css = 0
+
+  Command :MakeTexCodeHighlight to create a new buffer in a new window with
+  TeX code correctly highlighted accordingly to the current color scheme or
+  scheme declared in variable g:PhColorscheme. The command accepts optional
+  argument which defines that lines will be enumerated. If the argument is
+  missing then no line enumeration will be generated, if it is negative then
+  lines will be enumerated from the number of the first line in the original
+  buffer, otherwise lines will be enumerated from the value of the argument.
+
+  The both commands can act as the highlighting engine in filter vimhl.hs
+  shipped with this distribution. This program is supposed to be used like
+
+  pandoc -f html -t latex -F vimhl.hs -o document.tex document.html
+
+  It is possible to compile vimhl.hs:
+
+  ghc --make vimhl
+
+  Move vimhl.hs (or compiled program vimhl) somewhere in your $PATH.
+
+  When converting formats with pandoc ensure that original file has
+  additional parameter hl="vim" inside tag <pre> (as an example for HTML):
+  only in this case pandoc will choose vimhl.hs as highlighting filter.
+
+  The filter was tested only for HTML to TeX conversions: it may contain
+  bugs for other cases!
+
+  There are two other commands :GetFgColorUnderCursor and
+  :GetBgColorUnderCursor. They are included as they may help in debugging
+  and finding foreground or background colors under cursor. Normally i use
+  them in maps like following:
+
+  nmap <silent> ,vc :GetFgColorUnderCursor<CR>
+  nmap <silent> ,vb :GetBgColorUnderCursor<CR>
+
+Thanks to:
+  Christian Brabandt for plugin Colorizer and Xterm2rgb translation functions
