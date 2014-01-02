@@ -25,13 +25,14 @@ vimHl (Just format) cb@(CodeBlock (id, classes@(ft:_), namevals) contents)
             writeFile tempbuf contents
             {- vim must think that it was launched from a terminal, otherwise
              - it won't load its usual environment and the syntax engine! -}
-            newstdin <- openFile "/dev/tty" ReadMode
-            (_, _, _, handle) <- createProcess (shell $
-                "perl -e '`vim -Ne -c \"set ft=" ++ ft ++ " | " ++ vimhlcmd ++
-                "\" " ++ "-c \"w! " ++ tempfile ++ "\" -c \"qa!\" " ++
-                tempbuf ++ "`'") {std_in = UseHandle newstdin}
+            hin <- openFile "/dev/tty" ReadMode
+            (_, Just hout, _, handle) <- createProcess (shell $
+                "vim -Ne -c 'set ft=" ++ ft ++ " | " ++ vimhlcmd ++ "' " ++
+                "-c 'w! " ++ tempfile ++ "' -c 'qa!' " ++ tempbuf)
+                {std_in = UseHandle hin, std_out = CreatePipe}
             waitForProcess handle
-            hClose newstdin
+            hClose hin
+            hClose hout
             block <- readFile tempfile
             removeFile tempbuf
             removeFile tempfile

@@ -1,6 +1,6 @@
 " File: publish_helper.vim
 " Author: Alexey Radkov
-" Version: 0.1
+" Version: 0.1.1
 " Description: two commands for publishing highlighted code in HTML or TeX
 "              (optionally from pandoc as highlighting engine from filter
 "              vimhl.hs)
@@ -49,13 +49,7 @@
 "   nmap <silent> ,vc :GetFgColorUnderCursor<CR>
 "   nmap <silent> ,vb :GetBgColorUnderCursor<CR>
 "
-" Issues:
-"   1. tex code maker does not work properly with control characters.
-"   2. vimhl.hs requires perl to wrap call to vim around: this will make vim
-"      unaware that it is called from within pipes which is necessary to
-"      produce correct highlights. This wrapping is basically not a necessity
-"      and will be removed as soon as i find how to cheat vim without a
-"      wraper.
+" Issues: tex code maker does not work properly with control characters.
 "
 " Thanks: Christian Brabandt for plugin Colorizer and Xterm2rgb translation
 "         functions
