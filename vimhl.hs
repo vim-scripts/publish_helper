@@ -6,11 +6,12 @@ import System.IO
 import System.Directory
 import System.FilePath
 import System.Process
+import qualified Data.CaseInsensitive as CI
 
 vimHl :: Maybe Format -> Block -> IO Block
 vimHl (Just format) cb@(CodeBlock (id, classes@(ft:_), namevals) contents)
   | format == Format "html" || format == Format "latex" =
-        case lookup "hl" namevals of
+        case lookup (CI.mk "hl") ci_namevals of
         Just "vim" -> do
             let tempbuf  = "_vimhl_buffer"
                 tempfile = "_vimhl_result"
@@ -19,12 +20,12 @@ vimHl (Just format) cb@(CodeBlock (id, classes@(ft:_), namevals) contents)
                     | format == Format "latex" = "MakeTexCodeHighlight" ++ nmb
                     where nmb
                             | "numberLines" `elem` classes =
-                                case lookup "startfrom" namevals of
+                                case lookup (CI.mk "startFrom") ci_namevals of
                                 Nothing  -> " -1"
                                 Just val -> " " ++ val
                             | otherwise = ""
                 colorscheme =
-                    case lookup "colorscheme" namevals of
+                    case lookup (CI.mk "colorScheme") ci_namevals of
                     Nothing -> ""
                     Just val -> "-c 'let g:PhColorscheme = \"" ++ val ++ "\"' "
                 vimrcM = do
@@ -45,7 +46,7 @@ vimHl (Just format) cb@(CodeBlock (id, classes@(ft:_), namevals) contents)
              - it won't load its usual environment and the syntax engine! -}
             hin <- openFile "/dev/tty" ReadMode
             (_, Just hout, _, handle) <- createProcess (shell $
-                "vim -Ne " ++ vimrc ++ colorscheme ++ "-c 'set ft=" ++ ft ++
+                "vim -Nen " ++ vimrc ++ colorscheme ++ "-c 'set ft=" ++ ft ++
                 " | " ++ vimhlcmd ++ "' " ++ "-c 'w! " ++ tempfile ++
                 "' -c 'qa!' " ++ tempbuf)
                 {std_in = UseHandle hin, std_out = CreatePipe}
@@ -58,6 +59,7 @@ vimHl (Just format) cb@(CodeBlock (id, classes@(ft:_), namevals) contents)
             return $ RawBlock format block
         _          -> return cb
   | otherwise = return cb
+  where ci_namevals = map (\(x, y) -> (CI.mk x, y)) namevals
 vimHl _ cb = return cb
 
 main :: IO ()
