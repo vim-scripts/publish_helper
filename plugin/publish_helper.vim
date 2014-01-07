@@ -1,6 +1,6 @@
 " File: publish_helper.vim
 " Author: Alexey Radkov
-" Version: 0.4
+" Version: 0.5
 " Description: two commands for publishing highlighted code in HTML or TeX
 "              (optionally from pandoc as highlighting engine from filter
 "              vimhl.hs)
@@ -156,6 +156,44 @@ fun! <SID>make_html_code_highlight(prepare_for_insertion, line1, line2)
     endif
 endfun
 
+fun! <SID>add_synid(result, synId, line, linenr, fg, bg)
+    if !exists('g:PhCtrlTrans') || g:PhCtrlTrans == 0
+        call add(a:result,
+                    \ {'name': a:synId, 'content': a:line,
+                    \  'line': a:linenr, 'fg': a:fg, 'bg': a:bg})
+        return
+    endif
+    let len = strlen(a:line)
+    let pos = 0
+    let old_pos = 0
+    while pos != -1 && pos < len
+        let old_pos = pos
+        let pos = match(a:line, '[^[:print:]]', pos)
+        if pos != -1
+            if pos > old_pos
+                call add(a:result,
+                    \ {'name': a:synId,
+                    \  'content': strpart(a:line, old_pos, pos - old_pos),
+                    \  'line': a:linenr, 'fg': a:fg, 'bg': a:bg})
+            endif
+            let trans = synIDtrans(hlID('SpecialKey'))
+            let fg = toupper(<SID>Xterm2rgb256(synIDattr(trans, 'fg')))
+            let bg = toupper(<SID>Xterm2rgb256(synIDattr(trans, 'bg')))
+            call add(a:result,
+                    \ {'name': a:synId,
+                    \  'content': strtrans(strpart(a:line, pos, 1)),
+                    \  'line': a:linenr, 'fg': fg, 'bg': bg})
+            let pos += 1
+        endif
+    endwhile
+    if old_pos < len && pos == -1
+        call add(a:result,
+                    \ {'name': a:synId,
+                    \  'content': strpart(a:line, old_pos, len - old_pos),
+                    \  'line': a:linenr, 'fg': a:fg, 'bg': a:bg})
+    endif
+endfun
+
 fun! <SID>split_synids(fst_line, last_line)
     let result = []
     let save_winview = winsaveview()
@@ -171,6 +209,7 @@ fun! <SID>split_synids(fst_line, last_line)
             call setpos('.', cursor)
             continue
         endif
+        let line = getline('.')
         while cursor[2] <= cols
             let synId = synIDattr(synID(line('.'), col('.'), 1), 'name')
             let fg = toupper(<SID>get_color_under_cursor(0))
@@ -179,11 +218,9 @@ fun! <SID>split_synids(fst_line, last_line)
             call setpos('.', cursor)
             if synId != old_synId
                 if old_synId != '^'
-                    call add(result,
-                            \ {'name': old_synId,
-                            \ 'content': strpart(getline('.'), old_start - 1,
-                            \            cursor[2] - old_start - 1),
-                            \  'line': line('.'), 'fg': old_fg, 'bg': old_bg})
+                    call <SID>add_synid(result, old_synId,
+                    \ strpart(line, old_start - 1, cursor[2] - old_start - 1),
+                    \ line('.'), old_fg, old_bg)
                 endif
                 let old_synId = synId
                 let old_start = cursor[2] - 1
@@ -191,11 +228,9 @@ fun! <SID>split_synids(fst_line, last_line)
             let old_fg = fg
             let old_bg = bg
         endwhile
-        call add(result,
-                    \ {'name': synId,
-                    \ 'content': strpart(getline('.'), old_start - 1,
-                    \            cursor[2] - old_start - 1),
-                    \  'line': line('.'), 'fg': fg, 'bg': bg})
+        call <SID>add_synid(result, old_synId,
+                    \ strpart(line, old_start - 1, cursor[2] - old_start - 1),
+                    \ line('.'), old_fg, old_bg)
         let cursor[1] += 1
         let cursor[2] = 1
         call setpos('.', cursor)
@@ -204,7 +239,7 @@ fun! <SID>split_synids(fst_line, last_line)
     return result
 endfun
 
-fun! <SID>make_latex_code_highlight(fst_line, last_line, ...)
+fun! <SID>make_tex_code_highlight(fst_line, last_line, ...)
     let colors = g:colors_name
     if exists('g:PhColorscheme') && g:PhColorscheme != g:colors_name
         exe "colorscheme ".g:PhColorscheme
@@ -216,8 +251,8 @@ fun! <SID>make_latex_code_highlight(fst_line, last_line, ...)
     let save_paste = &paste
     new +set\ nowrap\ paste
     let numbers = ''
-    if a:0 > 1
-        let numbers = "numbers=left,firstnumber=".(a:2 < 0 ? a:fst_line : a:2)
+    if a:0
+        let numbers = "numbers=left,firstnumber=".(a:1 < 0 ? a:fst_line : a:1)
     endif
     call append(0, ['\begin{Shaded}', '\begin{Highlighting}['.numbers.']'])
     normal dd
@@ -234,12 +269,6 @@ fun! <SID>make_latex_code_highlight(fst_line, last_line, ...)
         let part = escape(hl['content'], '\{}_$%')
         let part = substitute(part, '\\\\', '\\textbackslash{}', 'g')
         let fg = hl['fg']
-        " small hack to paint syntax group links that could have been lost
-        " after switching colorscheme in black instead white
-        if exists('g:PhColorscheme') && g:PhColorscheme != colors &&
-                    \ a:0 && a:1 && fg == 'FFFFFF'
-            let fg = '000000'
-        endif
         if fg != 'NONE' && part !~ '^\s*$'
             let part = '\textcolor[HTML]{'.fg.'}{'.part.'}'
         endif
@@ -262,7 +291,7 @@ endfun
 command -range=% MakeHtmlCodeHighlight silent call
             \ <SID>make_html_code_highlight(1, <line1>, <line2>)
 command -range=% -nargs=? MakeTexCodeHighlight silent call
-            \ <SID>make_latex_code_highlight(<line1>, <line2>, 1, <f-args>)
+            \ <SID>make_tex_code_highlight(<line1>, <line2>, <f-args>)
 
 command GetFgColorUnderCursor echo <SID>get_color_under_cursor(0)
 command GetBgColorUnderCursor echo <SID>get_color_under_cursor(1)
