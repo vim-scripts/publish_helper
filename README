@@ -39,9 +39,6 @@ Usage:
   additional parameter hl="vim" inside tag <pre> (as an example for HTML):
   only in this case pandoc will choose vimhl.hs as highlighting filter.
 
-  The filter was tested only for HTML to TeX conversions: it may contain
-  bugs for other cases!
-
   There are two other commands :GetFgColorUnderCursor and
   :GetBgColorUnderCursor. They are included as they may help in debugging
   and finding foreground or background colors under cursor. Normally i use

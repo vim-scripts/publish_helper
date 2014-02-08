@@ -6,6 +6,7 @@ import System.IO
 import System.Directory
 import System.FilePath
 import System.Process
+import Text.Regex
 import Data.Char (toLower)
 
 vimHl :: Maybe Format -> Block -> IO Block
@@ -28,27 +29,39 @@ vimHl (Just format) cb@(CodeBlock (id, classes@(ft:_), namevals) contents)
                     case lookup "colorscheme" namevals' of
                     Nothing -> ""
                     Just val -> "-c 'let g:PhColorscheme = \"" ++ val ++ "\"' "
+                cmds =
+                    case lookup "vars" namevals' of
+                    Nothing -> ""
+                    Just val ->
+                        unwords (map cmd (map flag (filter (not . null)
+                            (map (splitRegex regex')
+                                 (splitRegex regex val))))) ++ " "
+                        where cmd (x:y:_) = "--cmd 'let g:" ++ x ++ " = \"" ++
+                                            y ++ "\"'"
+                              flag (x:[]) = [x, "1"]
+                              flag x      = x
+                              regex       = mkRegex "[[:space:]]*,[[:space:]]*"
+                              regex'      = mkRegex "[[:space:]]*=[[:space:]]*"
                 vimrcM = do
                     home <- getHomeDirectory
-                    exists <- doesFileExist $ vimrc home
+                    let vimrc = home `combine` ".vimrc.pandoc"
+                    exists <- doesFileExist vimrc
                     if exists
                         then do
-                            permissions <- getPermissions $ vimrc home
+                            permissions <- getPermissions vimrc
                             if readable permissions
-                                then return $ "--noplugin -u '" ++ vimrc home ++
-                                              "' "
+                                then return $ "--noplugin -u '" ++ vimrc ++ "' "
                                 else return ""
                         else return ""
-                    where vimrc home = home `combine` ".vimrc.pandoc"
             vimrc <- vimrcM
             writeFile tempbuf contents
             {- vim must think that it was launched from a terminal, otherwise
              - it won't load its usual environment and the syntax engine! -}
             hin <- openFile "/dev/tty" ReadMode
             (_, Just hout, _, handle) <- createProcess (shell $
-                "vim -Nen " ++ vimrc ++ colorscheme ++ "-c 'set ft=" ++ ft ++
-                " | " ++ vimhlcmd ++ "' " ++ "-c 'w! " ++ tempfile ++
-                "' -c 'qa!' " ++ tempbuf)
+                "vim -Nen " ++ cmds ++ vimrc ++ colorscheme ++
+                "-c 'set ft=" ++ ft ++ " | " ++ vimhlcmd ++ "' " ++
+                "-c 'w! " ++ tempfile ++ "' -c 'qa!' " ++ tempbuf)
                 {std_in = UseHandle hin, std_out = CreatePipe}
             waitForProcess handle
             hClose hin
