@@ -13,27 +13,33 @@ S_BG_COLOR='FFFFEE'
 F_COLOR='000000'
 SH_P_COLOR='000000'
 SH_O_COLOR='666666'
+LB_COLOR='000000'
 BG_COLOR_FMT='HTML'
 S_BG_COLOR_FMT='HTML'
 F_COLOR_FMT='HTML'
 SH_P_COLOR_FMT='HTML'
 SH_O_COLOR_FMT='HTML'
+LB_COLOR_FMT='HTML'
 
 ROUND_CORNER='0pt'
+LB_WIDTH='3pt'
 SCRIPTSIZE='
     \\scriptsize\'
 
-while getopts ':mb:s:f:r:dp:o:nh' opt ; do
+while getopts ':mb:s:l:w:f:r:dp:o:nch' opt ; do
     case $opt in
         m) MDFRAMED=1 ;;
         b) BG_COLOR=$OPTARG ;;
         s) S_BG_COLOR=$OPTARG ;;
+        l) LB_COLOR=$OPTARG ;;
+        w) LB_WIDTH=$OPTARG ;;
         f) MDFRAMED=1; F_COLOR=$OPTARG ;;
         r) MDFRAMED=1; ROUND_CORNER=$OPTARG ;;
         d) SHOUTPUT=1 ;;
         p) SHOUTPUT=1; SH_P_COLOR=$OPTARG ;;
         o) SHOUTPUT=1; SH_O_COLOR=$OPTARG ;;
         n) SCRIPTSIZE= ;;
+        c) HLCOMPAT=1 ;;
         h) cat <<END
 Prints to STDOUT Pandoc template for Latex compatible with vimhl;
 the template defines new environments: Shaded, Snugshade, Framed, Leftbar
@@ -49,6 +55,11 @@ Options:
   -s set background color in Snugshade code blocks;
      HTML, RGB and rgb (comma-separated values) formats are supported;
      default value is '$S_BG_COLOR'
+  -l set left bar color in Leftbar code blocks;
+     HTML, RGB and rgb (comma-separated values) formats are supported;
+     default value is '$LB_COLOR'
+  -w set left bar width in Leftbar code blocks;
+     default value is '$LB_WIDTH'
   -f set frame line color in Mdframed code blocks, implies option -m;
      HTML, RGB and rgb (comma-separated values) formats are supported;
      default value is '$F_COLOR'
@@ -62,6 +73,10 @@ Options:
      HTML, RGB and rgb (comma-separated values) formats are supported;
      default value is '$SH_O_COLOR'
   -n do not set scriptsize (which is set by default) in code blocks
+  -c add declarations required by the original pandoc code
+     highlighting engine; this may be useful if a document contains
+     parts to be highlighted by that
+
   -h print this message and exit
 
 END
@@ -75,7 +90,7 @@ done
 
 shift $((OPTIND-1))
 
-for i in 'BG_' 'S_BG_' 'F_' 'SH_P_' 'SH_O_' ; do
+for i in 'BG_' 'S_BG_' 'F_' 'SH_P_' 'SH_O_' 'LB_' ; do
     color=$(eval echo $`echo ${i}COLOR`)
     if [[ $color == *,* ]] ; then
         fmt='RGB'
@@ -110,6 +125,11 @@ IFS='' read -r -d '' RPL <<END
   \\\\setlength\\\\fboxsep{1pt}\\
   \\\\begin{framed}\\$SCRIPTSIZE
 }{\\\\end{framed}}\\
+\\\\renewenvironment{leftbar}{%\\
+  \\\\definecolor{leftbarcolor}{$LB_COLOR_FMT}{$LB_COLOR}%\\
+  \\\\def\\\\FrameCommand{{\\\\color{leftbarcolor}\\\\vrule width $LB_WIDTH} \\\\hspace{10pt}}%\\
+  \\\\MakeFramed {\\\\advance\\\\hsize-\\\\width \\\\FrameRestore}}%\\
+ {\\\\endMakeFramed}\\
 \\\\newenvironment{Leftbar}{\\
   \\\\setlength\\\\parskip{0cm}\\
   \\\\setlength\\\\partopsep{-\\\\topsep}\\
@@ -146,11 +166,29 @@ IFS='' read -r -d '' DRPL <<END
    moredelim=[il][\\\\color{shellpromptcolor}\\\\upshape]{|||\\\\ }}\\
 END
 
+IFS='' read -r -d '' CRPL <<END
+\\\\newcommand{\\\\KeywordTok}[1]{\\\\textcolor[rgb]{0.00,0.44,0.13}{\\\\textbf{{#1}}}}\\
+\\\\newcommand{\\\\DataTypeTok}[1]{\\\\textcolor[rgb]{0.56,0.13,0.00}{{#1}}}\\
+\\\\newcommand{\\\\DecValTok}[1]{\\\\textcolor[rgb]{0.25,0.63,0.44}{{#1}}}\\
+\\\\newcommand{\\\\BaseNTok}[1]{\\\\textcolor[rgb]{0.25,0.63,0.44}{{#1}}}\\
+\\\\newcommand{\\\\FloatTok}[1]{\\\\textcolor[rgb]{0.25,0.63,0.44}{{#1}}}\\
+\\\\newcommand{\\\\CharTok}[1]{\\\\textcolor[rgb]{0.25,0.44,0.63}{{#1}}}\\
+\\\\newcommand{\\\\StringTok}[1]{\\\\textcolor[rgb]{0.25,0.44,0.63}{{#1}}}\\
+\\\\newcommand{\\\\CommentTok}[1]{\\\\textcolor[rgb]{0.38,0.63,0.69}{\\\\textit{{#1}}}}\\
+\\\\newcommand{\\\\OtherTok}[1]{\\\\textcolor[rgb]{0.00,0.44,0.13}{{#1}}}\\
+\\\\newcommand{\\\\AlertTok}[1]{\\\\textcolor[rgb]{1.00,0.00,0.00}{\\\\textbf{{#1}}}}\\
+\\\\newcommand{\\\\FunctionTok}[1]{\\\\textcolor[rgb]{0.02,0.16,0.49}{{#1}}}\\
+\\\\newcommand{\\\\RegionMarkerTok}[1]{{#1}}\\
+\\\\newcommand{\\\\ErrorTok}[1]{\\\\textcolor[rgb]{1.00,0.00,0.00}{\\\\textbf{{#1}}}}\\
+\\\\newcommand{\\\\NormalTok}[1]{{#1}}\\
+END
+
 [ -n "$MDFRAMED" ] && RPL=$RPL$MRPL
 if [ -n "$SHOUTPUT" ] ; then
     RPL=$RPL$DRPL
     LST_IF_PTN='^\$if(listings)\$$'
 fi
+[ -n "$HLCOMPAT" ] && RPL=$RPL$CRPL
 
 pandoc -D latex |
 sed -e "/$LST_IF_PTN/N;/$LST_IF2_PTN/,/$ENDIF_PTN/d" \
